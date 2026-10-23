@@ -6,24 +6,61 @@
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pytest -q
+python -m pytest -q
 ```
 
-Current tests cover text chunking, empty input, overlap, and invalid configuration.
+The unit suite covers chunking boundaries and invalid settings, the LLM prompt contract and empty model responses, and the retrieval query's similarity cutoff and duplicate-chunk filtering. Ollama and PostgreSQL are mocked in these unit tests.
 
-## Integration smoke tests
+## Local integration smoke tests
 
-Start PostgreSQL and Ollama, start the API, then follow the upload/index/search/ask steps in INSTALLATION.md.
+Start Ollama and the Docker Compose stack. Then check the API and database readiness:
+
+```bash
+curl -sS http://localhost:8000/health/live
+curl -sS http://localhost:8000/health/ready
+```
+
+Upload a document:
+
+```bash
+curl -sS -X POST http://localhost:8000/documents \
+  -F 'file=@sample1.txt;type=text/plain'
+```
+
+Copy the returned id (UUID), then index it:
+
+```bash
+curl -sS -X POST 'http://localhost:8000/documents/REPLACE_WITH_DOCUMENT_UUID/process'
+```
+
+Search for relevant chunks:
+
+```bash
+curl -sS -X POST http://localhost:8000/search \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Which modules are used to scale Node.js?","top_k":3}'
+```
+
+Ask a question and receive an answer with source chunks:
+
+```bash
+curl -sS -X POST http://localhost:8000/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Which modules are used to scale Node.js?","top_k":3}'
+```
+
+Try an unanswerable question (for example, “Who is the CEO of the company?”) when that fact is absent from your uploaded files. It should abstain rather than invent an answer. This is a manual smoke test, not a deterministic assertion about local LLM output.
+
+Upload the exact same file again. The API should return HTTP 200 and the existing document id. Exact duplicate chunk text is only returned once during search. The default maximum cosine distance is 0.45; tune MAX_COSINE_DISTANCE against a representative evaluation set before relying on it.
 
 ## Recommended additional coverage
 
-- Upload success, invalid extension, invalid UTF-8, empty files, and size limits.
+- Upload validation and duplicate-upload race conditions (application-level deduplication is not a database uniqueness guarantee).
 - Missing IDs and status transitions.
 - Ollama timeout, HTTP errors, malformed responses, and wrong embedding dimensions.
 - Database failures in each endpoint.
 - Re-indexing and transaction rollback.
-- Empty index and unrelated questions.
+- Retrieval relevance and answer faithfulness using a labeled evaluation set.
 - Prompt injection inside uploaded documents.
-- Retrieval relevance and answer faithfulness using labeled examples.
 
-Database/Ollama tests should be separate integration tests, not part of the fast unit-test suite.
+Database/Ollama integration tests should remain separate from the fast unit-test suite.

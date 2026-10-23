@@ -6,13 +6,13 @@ from typing import Annotated
 from uuid import UUID
 
 import psycopg
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from pgvector import Vector
 from pgvector.psycopg import register_vector
 from pydantic import BaseModel, Field
 
 from app.chunking import split_text
-from app.config import CHUNK_OVERLAP, CHUNK_SIZE, MAX_DOCUMENT_BYTES
+from app.config import CHUNK_OVERLAP, CHUNK_SIZE, MAX_COSINE_DISTANCE, MAX_DOCUMENT_BYTES
 from app.db import get_connection, init_db
 from app.embeddings import generate_embedding
 from app.llm import generate_answer
@@ -78,12 +78,28 @@ def _search(question: str, top_k: int) -> list[SearchSource]:
         with get_connection() as connection:
             register_vector(connection)
             rows = connection.execute("""
-                SELECT dc.document_id, d.filename, dc.chunk_index, dc.content,
-                       dc.embedding <=> %s AS distance
-                FROM document_chunks AS dc JOIN documents AS d ON d.id = dc.document_id
-                WHERE d.status = 'indexed' AND dc.embedding IS NOT NULL
-                ORDER BY dc.embedding <=> %s LIMIT %s
-            """, (query_embedding, query_embedding, top_k)).fetchall()
+                WITH candidates AS (
+                    SELECT dc.document_id, d.filename, dc.chunk_index, dc.content,
+                           dc.embedding <=> %s AS distance
+                    FROM document_chunks AS dc
+                    JOIN documents AS d ON d.id = dc.document_id
+                    WHERE d.status = 'indexed' AND dc.embedding IS NOT NULL
+                ),
+                ranked AS (
+                    SELECT candidates.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY content
+                               ORDER BY distance, document_id
+                           ) AS duplicate_rank
+                    FROM candidates
+                    WHERE distance <= %s
+                )
+                SELECT document_id, filename, chunk_index, content, distance
+                FROM ranked
+                WHERE duplicate_rank = 1
+                ORDER BY distance
+                LIMIT %s
+            """, (query_embedding, MAX_COSINE_DISTANCE, top_k)).fetchall()
     except psycopg.Error as exc:
         logger.exception("Retrieval database error")
         raise HTTPException(503, "Could not retrieve relevant document chunks") from exc
@@ -106,7 +122,7 @@ def health_ready():
 
 
 @app.post("/documents", response_model=DocumentResponse, status_code=201)
-async def upload_document(file: Annotated[UploadFile, File()]):
+async def upload_document(file: Annotated[UploadFile, File()], response: Response):
     filename = file.filename or "upload.txt"
     if not filename.lower().endswith((".txt", ".md")):
         raise HTTPException(415, "Only .txt and .md files are supported")
@@ -122,11 +138,22 @@ async def upload_document(file: Annotated[UploadFile, File()]):
     digest = hashlib.sha256(raw).hexdigest()
     try:
         with get_connection() as connection:
-            row = connection.execute("""
-                INSERT INTO documents (id, filename, content_type, sha256, extracted_text)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id, filename, content_type, sha256, status, created_at
-            """, (uuid.uuid4(), filename, file.content_type or "text/plain", digest, content)).fetchone()
+            existing = connection.execute("""
+                SELECT id, filename, content_type, sha256, status, created_at
+                FROM documents
+                WHERE sha256 = %s
+                ORDER BY created_at
+                LIMIT 1
+            """, (digest,)).fetchone()
+            if existing:
+                response.status_code = 200
+                row = existing
+            else:
+                row = connection.execute("""
+                    INSERT INTO documents (id, filename, content_type, sha256, extracted_text)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id, filename, content_type, sha256, status, created_at
+                """, (uuid.uuid4(), filename, file.content_type or "text/plain", digest, content)).fetchone()
     except psycopg.Error as exc:
         logger.exception("Document upload database error")
         raise HTTPException(503, "Could not save document") from exc

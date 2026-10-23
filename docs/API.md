@@ -9,7 +9,7 @@ Base URL: http://localhost:8000. Interactive documentation is at /docs.
 
 ## POST /documents
 
-Multipart form field: file. Supports .txt and .md, UTF-8, non-empty content, maximum 2 MiB by default. Returns 201 with document ID, filename, content type, SHA-256, status, and creation time. Initial status is uploaded.
+Multipart form field: file. Supports .txt and .md, UTF-8, non-empty content, maximum 2 MiB by default. A new document returns 201 with document ID, filename, content type, SHA-256, status, and creation time. If the exact same bytes (same SHA-256) were already uploaded, the API returns the existing document with status 200 instead of creating another document record.
 
 Typical errors: 400 invalid or empty text, 413 too large, 415 unsupported extension, 503 database failure.
 
@@ -23,17 +23,13 @@ Splits stored text, generates embeddings, and stores chunks. Returns document ID
 
 ## POST /search
 
-Request body:
+Request body example: {"question":"Which technology handles caching?","top_k":3}
 
-```json
-{"question":"Which technology handles caching?","top_k":3}
-```
-
-Question length is 1–2000 characters; top_k is 1–10 and defaults to 3. Response contains question and results. Each result contains document ID, filename, chunk index, content, and cosine distance. Smaller distance means closer vectors; it is not a calibrated probability.
+Question length is 1–2000 characters; top_k is 1–10 and defaults to 3. Response contains question and results. Each result contains document ID, filename, chunk index, content, and cosine distance. Smaller distance means closer vectors; it is not a calibrated probability. Exact duplicate chunk text is returned only once. Chunks with distance above MAX_COSINE_DISTANCE are filtered out.
 
 ## POST /ask
 
-Uses the same request shape. Response contains question, generated answer, and sources. The model is prompted to answer only from retrieved context and abstain if it lacks an answer. Prompt instructions cannot guarantee zero hallucinations. The current implementation has no calibrated relevance threshold.
+Uses the same request shape. Response contains question, generated answer, and sources. The prompt instructs the model to answer when context directly answers or clearly implies the answer, even when wording differs, and to abstain when context genuinely lacks the information. Prompt instructions cannot guarantee zero hallucinations. The default retrieval cutoff is an uncalibrated heuristic; see Configuration.
 
 ## Error codes
 

@@ -76,6 +76,7 @@ For full setup and a complete upload/index/search/ask walkthrough, read [Install
 - [API reference and examples](docs/API.md)
 - [Database schema and vector search](docs/DATABASE.md)
 - [Environment configuration](docs/CONFIGURATION.md)
+- [LLM, RAG, and agent parameter guide](docs/LLM_RAG_AGENT_PARAMETERS.md) — parameter purpose, side effects, and tuning guidance
 - [Security controls and limitations](docs/SECURITY.md)
 - [Testing guide](docs/TESTING.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)

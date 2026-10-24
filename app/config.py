@@ -10,6 +10,6 @@ CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "150"))
 
 # Initial heuristic, not a calibrated probability. Tune against a labeled query set.
-MAX_COSINE_DISTANCE = float(os.getenv("MAX_COSINE_DISTANCE", "0.45"))
+MAX_COSINE_DISTANCE = float(os.getenv("MAX_COSINE_DISTANCE", "0.70"))
 if not 0.0 <= MAX_COSINE_DISTANCE <= 2.0:
     raise ValueError("MAX_COSINE_DISTANCE must be between 0.0 and 2.0")

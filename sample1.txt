@@ -1,0 +1,7 @@
+Our backend uses Go for high-performance services.
+PostgreSQL stores transactional data.
+Redis provides caching and rate limiting.
+Kafka handles asynchronous event processing.
+The RAG service retrieves relevant document chunks.
+Ollama generates embeddings for semantic search.
+Node.js is scaled using worker threads and the cluster module to handle CPU-intensive tasks and high concurrent requests.

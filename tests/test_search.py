@@ -50,7 +50,7 @@ def test_search_deduplicates_whitespace_variants_and_keeps_closest(monkeypatch):
         _row(
             "5207d2dd-182b-462e-bf9c-1d4259a5eae8",
             "sample1.txt",
-            "  Node.js   is scaled using worker threads and cluster module.\\n",
+            "  Node.js   is scaled using worker threads and cluster module.\n",
             0.4082,
         ),
         _row(

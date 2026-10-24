@@ -25,7 +25,7 @@ Splits stored text, generates embeddings, and stores chunks. Returns document ID
 
 Request body example: {"question":"Which technology handles caching?","top_k":3}
 
-Question length is 1–2000 characters; top_k is 1–10 and defaults to 3. Response contains question and results. Each result contains document ID, filename, chunk index, content, and cosine distance. Smaller distance means closer vectors; it is not a calibrated probability. Exact duplicate chunk text is returned only once. Chunks with distance above MAX_COSINE_DISTANCE are filtered out.
+Question length is 1–2000 characters; top_k is 1–10 and defaults to 3. Response contains question and results. Each result contains document ID, filename, chunk index, content, and cosine distance. Smaller distance means closer vectors; it is not a calibrated probability. Duplicate chunks are collapsed after whitespace normalization, with the closest match retained; this applies across duplicate document records too. Chunks with distance above MAX_COSINE_DISTANCE are filtered out.
 
 ## POST /ask
 

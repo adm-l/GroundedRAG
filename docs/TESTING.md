@@ -13,7 +13,9 @@ The unit suite covers chunking boundaries and invalid settings, the LLM prompt c
 
 ## Local integration smoke tests
 
-Start Ollama and the Docker Compose stack. Then check the API and database readiness:
+Start Ollama and the Docker Compose stack. The default API base URL is `http://localhost:8000`. If you changed the host port mapping because port 8000 is already occupied, replace the URL below with your mapped port (for example, `http://localhost:8001`). The API container still listens on port 8000 internally.
+
+Check the API and database readiness:
 
 ```bash
 curl -sS http://localhost:8000/health/live
@@ -27,7 +29,7 @@ curl -sS -X POST http://localhost:8000/documents \
   -F 'file=@sample1.txt;type=text/plain'
 ```
 
-Copy the returned id (UUID), then index it:
+Copy the returned `id` (UUID), then index it:
 
 ```bash
 curl -sS -X POST 'http://localhost:8000/documents/REPLACE_WITH_DOCUMENT_UUID/process'
@@ -49,9 +51,25 @@ curl -sS -X POST http://localhost:8000/ask \
   -d '{"question":"Which modules are used to scale Node.js?","top_k":3}'
 ```
 
-Try an unanswerable question (for example, “Who is the CEO of the company?”) when that fact is absent from your uploaded files. It should abstain rather than invent an answer. This is a manual smoke test, not a deterministic assertion about local LLM output.
+For the sample document containing the sentence about Node.js scaling, the answer should mention `worker threads` and the `cluster` module and include the relevant source chunk. Verify that the answer is supported by the returned source; a low cosine distance is not a calibrated confidence score.
 
-Upload the exact same file again. The API should return HTTP 200 and the existing document id. Duplicate chunks are filtered during search after whitespace normalization; the closest matching chunk is retained. Unit tests cover both normalized duplicates and a Python-side fallback guard. The default maximum cosine distance is 0.45; tune MAX_COSINE_DISTANCE against a representative evaluation set before relying on it.
+Try an unanswerable question when the fact is absent from all uploaded files:
+
+```bash
+curl -sS -X POST http://localhost:8000/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Which cloud provider does our backend use?","top_k":3}'
+```
+
+The expected behavior is to state that the documents do not provide the information, rather than invent a provider. This is a manual smoke test, not a deterministic assertion about local LLM output; inspect both the answer and its sources.
+
+## Duplicate retrieval test
+
+Uploading the exact same bytes twice tests document-level deduplication: the second upload should return HTTP 200 and the existing document ID. It does **not** create a second document record, so it is not by itself a test of duplicate-chunk retrieval.
+
+To test duplicate-chunk filtering across separate document records, create a second text file with the same sentence content but different whitespace (so its SHA-256 differs), upload and index it as a separate document, and run the same `/search` query. The normalized duplicate chunk should appear only once, with the closest matching chunk retained. The automated tests cover normalized duplicates and a Python-side fallback guard.
+
+The default maximum cosine distance is 0.45; tune `MAX_COSINE_DISTANCE` against a representative evaluation set before relying on it.
 
 ## Recommended additional coverage
 

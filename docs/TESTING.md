@@ -51,7 +51,7 @@ curl -sS -X POST http://localhost:8000/ask \
 
 Try an unanswerable question (for example, “Who is the CEO of the company?”) when that fact is absent from your uploaded files. It should abstain rather than invent an answer. This is a manual smoke test, not a deterministic assertion about local LLM output.
 
-Upload the exact same file again. The API should return HTTP 200 and the existing document id. Exact duplicate chunk text is only returned once during search. The default maximum cosine distance is 0.45; tune MAX_COSINE_DISTANCE against a representative evaluation set before relying on it.
+Upload the exact same file again. The API should return HTTP 200 and the existing document id. Duplicate chunks are filtered during search after whitespace normalization; the closest matching chunk is retained. Unit tests cover both normalized duplicates and a Python-side fallback guard. The default maximum cosine distance is 0.45; tune MAX_COSINE_DISTANCE against a representative evaluation set before relying on it.
 
 ## Recommended additional coverage
 

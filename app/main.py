@@ -2,7 +2,7 @@ import hashlib
 import logging
 import uuid
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Optional
 from uuid import UUID
 
 import psycopg
@@ -36,7 +36,7 @@ class DocumentResponse(BaseModel):
     content_type: str
     sha256: str
     status: str
-    created_at: str | None = None
+    created_at: Optional[str] = None
 
 
 class SearchRequest(BaseModel):

@@ -1,6 +1,6 @@
 # API reference
 
-Base URL: http://localhost:8000. Interactive documentation is at /docs.
+Base URL: http://localhost:8000. Interactive documentation is at /docs. If the default host port is already in use, change the host-side port mapping in Docker Compose and use that port consistently in client commands. For example, a local setup mapped to `8001:8000` is accessed at `http://localhost:8001`; the API still listens on port 8000 inside the container.
 
 ## Health endpoints
 
@@ -29,7 +29,19 @@ Question length is 1–2000 characters; top_k is 1–10 and defaults to 3. Respo
 
 ## POST /ask
 
-Uses the same request shape. Response contains question, generated answer, and sources. The prompt instructs the model to answer when context directly answers or clearly implies the answer, even when wording differs, and to abstain when context genuinely lacks the information. Prompt instructions cannot guarantee zero hallucinations. The default retrieval cutoff is an uncalibrated heuristic; see Configuration.
+Uses the same request shape as `/search`. Response contains `question`, generated `answer`, and `sources` (the retrieved chunks supplied as context).
+
+Example request:
+
+```bash
+curl -sS -X POST http://localhost:8000/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Which modules are used to scale Node.js?","top_k":3}'
+```
+
+When the indexed document says Node.js uses worker threads and the cluster module, the answer should identify those modules and return the source chunk from that document. A source's `distance` is the cosine distance for retrieval; it is not a confidence score or a guarantee that the generated answer is correct.
+
+The prompt instructs the model to answer when context directly answers or clearly implies the answer, even when wording differs, and to abstain when context genuinely lacks the information. Prompt instructions cannot guarantee zero hallucinations. Test unsupported questions manually and evaluate answer faithfulness on a representative dataset before relying on this behavior. The default retrieval cutoff is an uncalibrated heuristic; see Configuration.
 
 ## Error codes
 
